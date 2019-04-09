@@ -1,0 +1,185 @@
+---
+AWSTemplateFormatVersion:                   2010-09-09
+
+Description:                                RDS Template for ogba
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default:                          ogba Deployment Parameters
+        Parameters:
+          -                                 Action
+      - Label:
+          default:                          ogba Application Parameters
+        Parameters:
+          -                                 ChangeOrder
+          -                                 DBPassword
+          -                                 Environment
+    ParameterLabels:
+      Action:
+        default:                           "Action:"
+      ChangeOrder:
+        default:                           "Change Order number:"
+      DBPassword:
+        default:                           "Database Master Password:"
+      Environment:
+        default:                           "Environment Type:"
+
+Parameters:
+  CreateInitialResources:
+    Description: >
+                                            Creates all requisite resources that can be re-used on subsequent deployments
+    Type:                                   String
+    AllowedValues:                          ["yes", "no"]
+    Default:                                "no"
+  Action:
+    Description: >
+                                            Set up a new RDS in this account, or recover from a region failure.
+    Type:                                   String
+    AllowedValues:                        ["set up new stack (first run)", "recover from a disaster"]
+    Default:                               "set up new stack (first run)"
+  Environment:
+    Description:                            Application environment
+    Type:                                   String
+    AllowedValues:                         [qa, prod]
+    Default:                                prod
+  ChangeOrder:
+    Description:                            PRODUCTION ONLY - CO Number
+    Type:                                   String
+    Default:                                C0123456789
+  DBPassword:
+    Default:                                master2016
+    Description:                            Master password for ogba Database
+    Type:                                   String
+    MinLength:                              8
+    NoEcho:                                 true
+
+Conditions:
+  CreateInitialResources:                   !Equals [ !Ref CreateInitialResources, "yes" ]
+
+Mappings:
+ !!str 326715682593:                       # Production account map
+   us-east-1:
+     RdsKmsKeyId:                            arn:aws:kms:us-east-1:326715682593:key/c0f6a302-f28d-44f8-920f-94956745b63b
+     #DBParameterGroupName:                   sqlse-12-0
+     #OptionGroupName:                        sqlse-12-0
+     SgogbaDb:                               sg-e5365e92
+     SubnetAz1:                              subnet-384d0d71
+     SubnetAz2:                              subnet-548b1a79
+     SnsTopicArn:                            "arn:aws:sns:us-east-1:326715682593:ogbadatabase"
+     Region:                                 east
+     HostedZone:                             abrahamogba.com.
+     DNSName:                                route53-rds.abrahamogba.com.
+   us-west-2:
+     RdsKmsKeyId:                            arn:aws:kms:us-east-1:326715682593:key/c0f6a302-f28d-44f8-920f-94956745b63b
+     #DBParameterGroupName:                   sqlse-12-0
+     #OptionGroupName:                        sqlse-12-0
+     SgogbaDb:                               sg-08b39875
+     SubnetAz1:                              subnet-02f5ca5a
+     SubnetAz2:                              subnet-b63289d1
+ #    SnsTopicArn:                            "arn:aws:sns:us-east-1:326715682593:ogbadatabase"
+     Region:                                 west
+
+
+
+ # Non-production account map
+ !!str 187212085277:
+   us-east-1:
+     RdsKmsKeyId:                           arn:aws:kms:us-east-1:187212085277:key/d3c2ad59-8b5c-4e83-93ad-6ca32093c905
+     #DBParameterGroupName:                  sqlse-12-0
+     #OptionGroupName:                       sqlse-12-0
+     SgogbaDb:                              sg-e40c0496
+     SubnetAz1:                             subnet-51be146e
+     SubnetAz2:                             subnet-884bb2a7
+ #    SnsTopicArn:                           "arn:aws:sns:us-east-1:326715682593:ogbadatabase"
+     Region:                                east
+   us-west-2:
+     RdsKmsKeyId:                           arn:aws:kms:us-east-1:187212085277:key/d3c2ad59-8b5c-4e83-93ad-6ca32093c905
+     #DBParameterGroupName:                  sqlse-12-0
+     #OptionGroupName:                       sqlse-12-0
+     SgogbaDb:                              sg-8fa48ff2
+     SubnetAz1:                             subnet-5d2fb615
+     SubnetAz2:                             subnet-ecf1c9b7
+ #    SnsTopicArn:                           "arn:aws:sns:us-east-1:326715682593:ogbadatabase"
+     Region:                                west
+
+
+ # Common across all accounts/environments map
+ Common:
+   Tag:
+     APC:                                   ogbadb
+     Owner:                                 abrahamdimma@gmail.com
+     cmdbenvironment:                       cloudformationforabrahamogba
+
+Resources:
+
+  NotificationsTopic:                    # SNS topic for CloudWatch alarms
+    Type:                                  "AWS::SNS::Topic"
+    Condition:                              CreateInitialResources
+    Properties:
+      DisplayName:                          ogbadatabase
+      TopicName:                            ogbadatabase
+      Subscription:
+        - Endpoint:                         abrahamdimma@gmail.com
+          Protocol:                         email
+        - Endpoint:                         abrahamositadimma@yahoo.com
+          Protocol:                         email
+
+  DBInstance:
+    Type:                                  "AWS::RDS::DBInstance"
+    Properties:
+      AllocatedStorage:                    "200"
+      AllowMajorVersionUpgrade:             false
+      AutoMinorVersionUpgrade:              true
+      BackupRetentionPeriod:               "21"
+      DBInstanceClass:                      db.m3.medium
+      DBInstanceIdentifier:                !Join ["-", ["ogbalegacy", !Sub "${Environment}", !Ref "AWS::StackName"]]
+      #DBParameterGroupName:                 sqlse-12-0
+      #OptionGroupName:                      !FindInMap [!Ref "AWS::AccountId", !Ref "AWS::Region", OptionGroupName]
+      #DBSnapshotIdentifier:                !If [Recover, !GetAtt RdsRecovery.SnapshotId, !Ref "AWS::NoValue"]
+      #DBSubnetGroupName:                   !FindInMap [!Ref "AWS::AccountId", !Ref "AWS::Region", RdsSubnetGroup]
+      Engine:                               oracle-se
+      EngineVersion:                        11.2.0.4.v13  # TODO: figure this out too
+      KmsKeyId:                            !FindInMap [!Ref "AWS::AccountId", !Ref "AWS::Region", RdsKmsKeyId]
+      LicenseModel:                         bring-your-own-license
+      MasterUsername:                       master
+      MasterUserPassword:                  !Ref DBPassword
+      MonitoringInterval:                   60
+      MonitoringRoleArn:                   !Join ["", ["arn:aws:iam::", !Ref "AWS::AccountId", ":role/rds-monitoring-role"]]
+      MultiAZ:                             false
+      Port:                                "1521"
+      PreferredBackupWindow:               "00:00-00:30"  # UTC, 1900-1930PM EST
+      PreferredMaintenanceWindow:          "Sun:05:00-Sun:05:30"  # UTC, Sundays 0000-0030 EST
+
+      PubliclyAccessible:                   yes
+      StorageEncrypted:                     true
+      StorageType:                          gp2
+      Tags:
+        - Key:                              ASV
+          Value:                           !FindInMap [Common, Tag, APC]
+        - Key:                              OwnerContact
+          Value:                           !FindInMap [Common, Tag, Owner]
+        - Key:                              cmdbenvironment
+          Value:                           !FindInMap [Common, Tag, cmdbenvironment]
+      VPCSecurityGroups:
+        -                                  !FindInMap [!Ref "AWS::AccountId", !Ref "AWS::Region", SgogbaDb]
+
+#  Outputs:
+#    DBInstance:
+#      Description:                         The Connection Endpoint to Mydb
+#      Value:
+#      - Fn::GetAtt:                         BDInstance.Endpoint.Address
+
+#  myDNSRecord2:
+  ogbaCNAME:
+    Type:                                    AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName:                        !FindInMap [!Ref "AWS::AccountId", !Ref "AWS::Region", HostedZone]
+#      HostedZoneName:                        abrahamogba.com.
+      Name:                                  !FindInMap [!Ref "AWS::AccountId", !Ref "AWS::Region", DNSName]
+#      Name:                                  myroute53.abrahamogba.com.
+      Type:                                  CNAME
+      TTL:                                   '900'
+      ResourceRecords:
+      - Fn::GetAtt:                          DBInstance.Endpoint.Address                              

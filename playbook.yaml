@@ -1,0 +1,18 @@
+---
+- hosts: localhost
+  become: true
+  become_user: root
+  gather_facts: yes
+  connection: local
+
+  tasks:
+  - name: deploy rds CFT
+    cloudformation:
+      aws_access_key: "{{ aws_access_key }}"
+      aws_secret_key: "{{ aws_secret_key }}"
+      stack_name: "{{ stack_name }}"
+      state: "{{ state }}"
+      region: "{{ aws_region }}"
+      disable_rollback: true
+      template: "route53.yaml"
+
