@@ -22,12 +22,12 @@ pipeline {
                           if(aws_region=="us-east-1") {
                               sh """
                               echo "deploying us-east-1 stack"
-                              ansible-playbook  --extra-vars "ansible_python_interpreter=/usr/bin/python stack_name=${stack_name} state=${state} aws_region=${aws_region} aws_secret_key=$aws_secret_key aws_access_key=$aws_access_key" ${WORKSPACE}/route53.yaml
+                              ansible-playbook  --extra-vars "ansible_python_interpreter=/usr/bin/python stack_name=${stack_name} state=${state} aws_region=${aws_region} aws_secret_key=$aws_secret_key aws_access_key=$aws_access_key" ${WORKSPACE}/playbook.yaml
                               echo "stack creation is complete"
                               """
                           }
                           if(aws_region=="us-west-2") {
-                              sh 'ansible-playbook --extra-vars "ansible_python_interpreter=/usr/bin/python stack_name=${stack_name} state=${state} aws_region=${aws_region} aws_secret_key=${aws_secret_key} aws_access_key=${aws_access_key}" ${WORKSPACE}/route53.yaml'
+                              sh 'ansible-playbook --extra-vars "ansible_python_interpreter=/usr/bin/python stack_name=${stack_name} state=${state} aws_region=${aws_region} aws_secret_key=${aws_secret_key} aws_access_key=${aws_access_key}" ${WORKSPACE}/playbook.yaml'
                           }
                      }
                  }
